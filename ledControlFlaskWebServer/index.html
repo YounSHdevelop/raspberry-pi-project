@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8">
+    <title>LED TEST</title>  <!-- 브라우저 탭 제목 -->
+  </head>
+  <body>
+    <h1>LED {{status}}</h1>  <!-- status 변수에 따라 "LED ON" 또는 "LED OFF" 표시 -->
+
+    <!-- /data 경로로 POST 요청을 전송하는 폼 -->
+    <form action="/data" method="post">
+      <input type="submit" name="led" value="on">   <!-- 클릭 시 led=on 전송 -->
+      <input type="submit" name="led" value="off">  <!-- 클릭 시 led=off 전송 -->
+    </form>
+  </body>
+</html>
