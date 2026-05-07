@@ -18,6 +18,8 @@
 │       └── index.html
 ├── weatherDisplayGuiUseApiKey/ # OpenWeatherMap API 기반 온습도 GUI
 │   └── main.py
+├── weatherForecastNotifierUsingTelegramBot/ # 텔레그램 봇 날씨 예보 알림
+│   └── main.py
 └── README.md
 ```
 
@@ -123,12 +125,38 @@ OpenWeatherMap API로 서울의 현재 온도·습도를 받아와 tkinter GUI �
 
 ---
 
+### 6. 텔레그램 봇 날씨 예보 알림 (`weatherForecastNotifierUsingTelegramBot`)
+
+OpenWeatherMap의 5일/3시간 예보 API로 서울의 향후 24시간(3시간 간격 8개 구간) 예보를 받아와 정해진 시간마다 텔레그램 봇으로 발송하는 프로그램
+
+**사용 라이브러리**
+- `urllib.request` — API HTTP 요청
+- `json` — 응답 JSON 파싱
+- `datetime` — 현재 시각 비교
+- `asyncio` — 비동기 루프
+- `python-telegram-bot` — 텔레그램 봇 메시지 전송
+
+**동작 방식**
+- 매초 현재 시각을 확인
+- `ALERT_HOURS` (`07, 10, 13, 16, 19, 22`시 정각) 또는 `ALERT_TIMES` (`10:25`, `15:20`)와 일치할 때
+  → OpenWeatherMap forecast API 호출 (`cnt=8`로 24시간 분량)
+  → 응답 시각(UTC)을 KST(+9)로 변환하여 `(시각h 온도C 습도% 날씨설명)` 형식으로 정리
+  → 텔레그램 봇이 지정된 chat_id로 메시지 전송
+- `Ctrl + C` 입력 시 정상 종료
+
+**준비물**
+- [@BotFather](https://t.me/BotFather)에서 봇 생성 후 토큰 발급 → `my_token`에 입력
+- 봇과 1회 이상 대화한 본인 텔레그램 chat_id → `telegram_id`에 입력
+- [OpenWeatherMap](https://openweathermap.org/api) API 키 → `api_key`에 입력
+
+---
+
 ## 실행 환경
 
 - **하드웨어**: Raspberry Pi (GPIO 지원 모델)
 - **OS**: Raspberry Pi OS
 - **Python**: 3.x
-- **라이브러리**: `gpiozero`, `picamera2` (Raspberry Pi OS 기본 포함), `flask`, `tkinter` (Python 기본 포함)
+- **라이브러리**: `gpiozero`, `picamera2` (Raspberry Pi OS 기본 포함), `flask`, `tkinter` (Python 기본 포함), `python-telegram-bot`
 
 ## 실행 방법
 
@@ -147,6 +175,9 @@ sudo python3 ledControlFlaskWebServer/main.py
 
 # 온습도 표시 GUI
 python3 weatherDisplayGuiUseApiKey/main.py
+
+# 텔레그램 봇 날씨 예보 알림
+python3 weatherForecastNotifierUsingTelegramBot/main.py
 ```
 
 > 종료: `Ctrl + C`
