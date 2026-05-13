@@ -20,6 +20,8 @@
 │   └── main.py
 ├── weatherForecastNotifierUsingTelegramBot/ # 텔레그램 봇 날씨 예보 알림
 │   └── main.py
+├── mqttCommunication/        # MQTT 양방향 LED 제어 모듈
+│   └── main.py
 └── README.md
 ```
 
@@ -151,12 +153,41 @@ OpenWeatherMap의 5일/3시간 예보 API로 서울의 향후 24시간(3시간 �
 
 ---
 
+### 7. MQTT 양방향 LED 제어 (`mqttCommunication`)
+
+라즈베리파이에 설치된 Mosquitto 브로커를 통해 MQTT 메시지를 송·수신하는 프로그램. 외부에서 보낸 명령어로 LED를 제어하는 동시에, 자체적으로 카운트 값을 일정 주기로 발행하여 양방향 통신을 구현
+
+**사용 부품**
+| 부품 | GPIO 핀 | 입출력 |
+|------|---------|--------|
+| 초록 LED | GPIO 16 | 출력 |
+| 파란 LED | GPIO 20 | 출력 |
+| 빨간 LED | GPIO 21 | 출력 |
+
+**사용 라이브러리**
+- `paho-mqtt` — MQTT 클라이언트
+- `gpiozero` — LED 제어
+- `threading` — 송신과 수신을 동시에 처리하기 위한 멀티스레딩
+
+**동작 방식**
+- **수신**: `led` 토픽을 QoS 1로 구독 → 메시지(`green_on`/`green_off`/`blue_on`/`blue_off`/`red_on`/`red_off`)에 따라 해당 LED를 켜고 끔
+- **송신**: 별도 thread에서 1초마다 `hello` 토픽으로 카운트 값을 발행
+- 메인 thread는 `loop_forever()`로 수신을 지속, 송신은 thread로 분리하여 동시 동작
+
+**준비물**
+- 라즈베리파이에 Mosquitto 브로커 설치 (`sudo apt install mosquitto mosquitto-clients`)
+- `paho-mqtt` 패키지 설치 (`pip install paho-mqtt`)
+- `main.py`의 `broker_address`를 자신의 라즈베리파이 IP로 수정
+
+---
+
 ## 실행 환경
 
 - **하드웨어**: Raspberry Pi (GPIO 지원 모델)
 - **OS**: Raspberry Pi OS
 - **Python**: 3.x
-- **라이브러리**: `gpiozero`, `picamera2` (Raspberry Pi OS 기본 포함), `flask`, `tkinter` (Python 기본 포함), `python-telegram-bot`
+- **라이브러리**: `gpiozero`, `picamera2` (Raspberry Pi OS 기본 포함), `flask`, `tkinter` (Python 기본 포함), `python-telegram-bot`, `paho-mqtt`
+- **브로커**: Mosquitto (MQTT 모듈용, 라즈베리파이에 설치)
 
 ## 실행 방법
 
@@ -178,6 +209,9 @@ python3 weatherDisplayGuiUseApiKey/main.py
 
 # 텔레그램 봇 날씨 예보 알림
 python3 weatherForecastNotifierUsingTelegramBot/main.py
+
+# MQTT 양방향 LED 제어 (브로커 실행 후 사용)
+python3 mqttCommunication/main.py
 ```
 
 > 종료: `Ctrl + C`
