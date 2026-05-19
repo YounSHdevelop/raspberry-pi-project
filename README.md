@@ -22,6 +22,8 @@
 │   └── main.py
 ├── mqttCommunication/        # MQTT 양방향 LED 제어 모듈
 │   └── main.py
+├── voiceRecognitionWeatherNotifier/ # 음성 인식 날씨 음성 안내 모듈
+│   └── main.py
 └── README.md
 ```
 
@@ -181,13 +183,46 @@ OpenWeatherMap의 5일/3시간 예보 API로 서울의 향후 24시간(3시간 �
 
 ---
 
+### 8. 음성 인식 날씨 음성 안내 (`voiceRecognitionWeatherNotifier`)
+
+마이크로 음성을 입력받아 Google 음성 인식으로 텍스트화하고, "날씨"라는 단어가 인식되면 OpenWeatherMap API로 서울의 현재 기온·습도를 받아와 espeak로 음성 안내하는 프로그램
+
+**사용 라이브러리**
+- `speech_recognition` — 마이크 입력 녹음 및 Google 음성 인식 API 호출
+- `requests` — OpenWeatherMap API HTTP 요청
+- `os` — `espeak` 시스템 명령 실행
+- `espeak` — 텍스트를 음성으로 출력하는 외부 프로그램(시스템 설치 필요)
+
+**사용 부품**
+| 부품 | 연결 | 입출력 |
+|------|------|--------|
+| USB 마이크 | USB 포트 | 입력 |
+| 스피커/이어폰 | 오디오 잭·USB | 출력 |
+
+**동작 방식**
+- 무한 루프에서 매 반복마다 마이크로 음성을 녹음 (`r.listen()`)
+- 녹음된 오디오를 Google 음성 인식 서버로 전송하여 한국어(`ko-KR`) 텍스트로 변환
+- 인식된 텍스트에 "날씨" 키워드가 포함되면 OpenWeatherMap의 서울 현재 날씨 API 호출
+- 응답 JSON에서 `main.temp` (기온), `main.humidity` (습도)를 추출
+- `espeak`로 `기온은 N도 습도는 N퍼센트 입니다` 메시지를 한국어 여성 음성(`ko+f5`)으로 출력
+- `Ctrl + C` 입력 시 정상 종료
+
+**준비물**
+- USB 마이크와 스피커(또는 이어폰) 연결
+- espeak 설치 (`sudo apt install espeak`)
+- `speech_recognition`, `requests` 패키지 설치 (`pip install SpeechRecognition requests`)
+- [OpenWeatherMap](https://openweathermap.org/api) API 키 → `main.py`의 `API_KEY` 값에 입력
+
+---
+
 ## 실행 환경
 
 - **하드웨어**: Raspberry Pi (GPIO 지원 모델)
 - **OS**: Raspberry Pi OS
 - **Python**: 3.x
-- **라이브러리**: `gpiozero`, `picamera2` (Raspberry Pi OS 기본 포함), `flask`, `tkinter` (Python 기본 포함), `python-telegram-bot`, `paho-mqtt`
+- **라이브러리**: `gpiozero`, `picamera2` (Raspberry Pi OS 기본 포함), `flask`, `tkinter` (Python 기본 포함), `python-telegram-bot`, `paho-mqtt`, `SpeechRecognition`, `requests`
 - **브로커**: Mosquitto (MQTT 모듈용, 라즈베리파이에 설치)
+- **외부 프로그램**: espeak (음성 안내 모듈용, `sudo apt install espeak`)
 
 ## 실행 방법
 
@@ -212,6 +247,9 @@ python3 weatherForecastNotifierUsingTelegramBot/main.py
 
 # MQTT 양방향 LED 제어 (브로커 실행 후 사용)
 python3 mqttCommunication/main.py
+
+# 음성 인식 날씨 음성 안내 (마이크·스피커 연결 후 사용)
+python3 voiceRecognitionWeatherNotifier/main.py
 ```
 
 > 종료: `Ctrl + C`
