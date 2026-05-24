@@ -24,6 +24,8 @@
 │   └── main.py
 ├── voiceRecognitionWeatherNotifier/ # 음성 인식 날씨 음성 안내 모듈
 │   └── main.py
+├── drowsinessPreventionDevice/ # 졸음 방지 장치 (얼굴·눈 검출)
+│   └── main.py
 └── README.md
 ```
 
@@ -215,12 +217,43 @@ OpenWeatherMap의 5일/3시간 예보 API로 서울의 향후 24시간(3시간 �
 
 ---
 
+### 9. 졸음 방지 장치 (`drowsinessPreventionDevice`)
+
+웹캠으로 운전자의 얼굴과 눈을 실시간 검출하여, 눈이 일정 시간 감겨 있으면(=검출되지 않으면) 능동 부저로 경고를 울리는 프로그램. OpenCV의 Haar Cascade 분류기를 사용
+
+**사용 부품**
+| 부품 | GPIO 핀 / 연결 | 입출력 |
+|------|----------------|--------|
+| USB 웹캠 | USB 포트 | 입력 |
+| 능동 부저 | GPIO 16 | 출력 |
+
+**사용 라이브러리**
+- `opencv-python` (`cv2`) — 영상 캡처, grayscale 변환, Haar Cascade 기반 얼굴·눈 검출, 화면 표시
+- `gpiozero` — 능동 부저 제어
+- `time` — 표준 라이브러리
+
+**동작 방식**
+- 카메라(640×480)에서 프레임을 읽어 grayscale로 변환 (Haar 특징은 명암 차이로 계산)
+- `haarcascade_frontalface_default.xml`로 얼굴 검출 (최소 100×100 크기)
+- 검출된 얼굴 ROI 내부에서만 `haarcascade_eye.xml`로 눈 검출 (오탐 감소·속도 향상)
+- 검출된 눈 개수가 1개 이하 → 졸음으로 판단하여 부저 ON
+- 검출된 눈 개수가 2개 이상 → 정상으로 판단하여 부저 OFF
+- 얼굴은 파란색, 눈은 초록색 사각형으로 표시하여 결과 창에 출력
+- `q` 키 입력 시 종료 (카메라 창 닫고 부저 OFF)
+
+**준비물**
+- USB 웹캠 연결
+- OpenCV 설치 (`pip install opencv-python`)
+- Haar Cascade XML 파일은 OpenCV 설치 시 `cv2.data.haarcascades` 경로에 기본 포함되어 별도 다운로드 불필요
+
+---
+
 ## 실행 환경
 
 - **하드웨어**: Raspberry Pi (GPIO 지원 모델)
 - **OS**: Raspberry Pi OS
 - **Python**: 3.x
-- **라이브러리**: `gpiozero`, `picamera2` (Raspberry Pi OS 기본 포함), `flask`, `tkinter` (Python 기본 포함), `python-telegram-bot`, `paho-mqtt`, `SpeechRecognition`, `requests`
+- **라이브러리**: `gpiozero`, `picamera2` (Raspberry Pi OS 기본 포함), `flask`, `tkinter` (Python 기본 포함), `python-telegram-bot`, `paho-mqtt`, `SpeechRecognition`, `requests`, `opencv-python`
 - **브로커**: Mosquitto (MQTT 모듈용, 라즈베리파이에 설치)
 - **외부 프로그램**: espeak (음성 안내 모듈용, `sudo apt install espeak`)
 
@@ -250,6 +283,9 @@ python3 mqttCommunication/main.py
 
 # 음성 인식 날씨 음성 안내 (마이크·스피커 연결 후 사용)
 python3 voiceRecognitionWeatherNotifier/main.py
+
+# 졸음 방지 장치 (웹캠 연결 후 사용)
+python3 drowsinessPreventionDevice/main.py
 ```
 
 > 종료: `Ctrl + C`
