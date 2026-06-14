@@ -1,44 +1,47 @@
 import os
 os.environ['QT_QPA_PLATFORM'] = 'xcb'  # Wayland 환경에서 OpenCV 창이 열리지 않는 문제 해결
 
-import cv2
-from gpiozero import LED, Buzzer
-import time
-import threading
-import asyncio
-from datetime import datetime
-from telegram import Bot
+import cv2                              # OpenCV: 웹캠 영상 처리 및 QR 코드 인식
+from gpiozero import LED, Buzzer        # GPIO 핀 출력 제어
+import time                             # 지연 처리
+import threading                        # GPIO 제어를 별도 스레드로 분리
+import asyncio                          # 텔레그램 비동기 전송
+from datetime import datetime           # 출입 로그 시각 기록
+from telegram import Bot                # 텔레그램 봇 메시지·사진 전송
 
+# QR 코드 데이터(키) → 직원 정보 매핑
 EMPLOYEES = {
     "EMP001_홍길동": {"name": "홍길동", "level": 1, "role": "일반직원", "en": "Hong (Staff)"},
     "EMP002_김철수": {"name": "김철수", "level": 2, "role": "관리자",   "en": "Kim (Manager)"},
     "EMP003_박사장": {"name": "박사장", "level": 3, "role": "임원",     "en": "Park (Exec)"},
 }
 
-TELEGRAM_TOKEN   = "Enter your bot token here"
-TELEGRAM_CHAT_ID = "Enter your chat ID here"
+TELEGRAM_TOKEN   = "Enter your bot token here"   # BotFather에서 발급받은 봇 토큰
+TELEGRAM_CHAT_ID = "Enter your chat ID here"      # 알림을 받을 텔레그램 채팅 ID
 
-green_led = LED(20)
-red_led   = LED(21)
-buzzer    = Buzzer(18)
+green_led = LED(20)     # 초록 LED: GPIO 20번 핀 — 출입 허가 시 점등
+red_led   = LED(21)     # 빨간 LED: GPIO 21번 핀 — 출입 거부 시 점등
+buzzer    = Buzzer(18)  # 능동 부저: GPIO 18번 핀
 
-camera = cv2.VideoCapture(-1)  # -1: 연결된 웹캠 자동 감지
-camera.set(cv2.CAP_PROP_FRAME_WIDTH, 640)
-camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)
+camera = cv2.VideoCapture(-1)                   # -1: 연결된 웹캠 자동 감지
+camera.set(cv2.CAP_PROP_FRAME_WIDTH, 640)       # 가로 해상도 설정
+camera.set(cv2.CAP_PROP_FRAME_HEIGHT, 480)      # 세로 해상도 설정
 
 if not camera.isOpened():
     print("카메라를 열 수 없습니다.")
     exit()
 
-qr_detector   = cv2.QRCodeDetector()
-is_processing = False  # True인 동안 QR 인식을 건너뜀 (중복 실행 방지)
-status_text   = ""
+qr_detector   = cv2.QRCodeDetector()   # QR 코드 위치 탐지 및 문자열 디코딩 객체
+is_processing = False   # True인 동안 QR 인식을 건너뜀 (중복 실행 방지)
+status_text   = ""      # 카메라 화면에 오버레이할 상태 문자열
+
 
 def save_log(name, role, result):
     now = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     with open("access_log.txt", "a", encoding="utf-8") as f:
-        f.write(f"{now} | {name} | {role} | {result}\n")
+        f.write(f"{now} | {name} | {role} | {result}\n")  # 출입 이력 파일 저장
     print(f"[로그] {now} | {name} | {role} | {result}")
+
 
 async def _send_message(text):
     try:
@@ -47,16 +50,18 @@ async def _send_message(text):
     except Exception as e:
         print(f"[텔레그램 전송 실패] {e}")
 
+
 async def _send_photo(frame, caption):
     try:
         bot = Bot(token=TELEGRAM_TOKEN)
-        cv2.imwrite("intruder.jpg", frame)
+        cv2.imwrite("intruder.jpg", frame)          # 캡처 프레임을 파일로 저장
         with open("intruder.jpg", "rb") as photo:
             await bot.send_photo(chat_id=TELEGRAM_CHAT_ID, photo=photo, caption=caption)
     except Exception as e:
         print(f"[텔레그램 사진 전송 실패] {e}")
 
-def access_level1(name, role, en):
+
+def access_level1(name, role, en):      # 일반직원: 초록 LED 1초, 부저 1회
     global is_processing, status_text
     try:
         status_text = f"GRANTED: {en}"
@@ -67,9 +72,10 @@ def access_level1(name, role, en):
         asyncio.run(_send_message(f"[출입 허가] {name} ({role})"))
     finally:
         status_text = ""
-        is_processing = False  # 예외 발생 여부와 관계없이 반드시 해제
+        is_processing = False   # 예외 발생 여부와 관계없이 반드시 해제
 
-def access_level2(name, role, en):
+
+def access_level2(name, role, en):      # 관리자: 초록 LED 2초, 부저 2회
     global is_processing, status_text
     try:
         status_text = f"GRANTED: {en}"
@@ -84,7 +90,8 @@ def access_level2(name, role, en):
         status_text = ""
         is_processing = False
 
-def access_level3(name, role, en):
+
+def access_level3(name, role, en):      # 임원: 초록 LED 깜빡임 3회 후 2초 점등, 부저 3회
     global is_processing, status_text
     try:
         status_text = f"VIP: {en}"
@@ -99,7 +106,8 @@ def access_level3(name, role, en):
         status_text = ""
         is_processing = False
 
-def alarm(frame):
+
+def alarm(frame):       # 미등록 QR: 빨간 LED + 경보음 3회 + 텔레그램 사진 전송
     global is_processing, status_text
     try:
         status_text = "DENIED: Unknown QR"
@@ -114,18 +122,19 @@ def alarm(frame):
         status_text = ""
         is_processing = False
 
+
 def main():
     global is_processing
     print("QR 출입 통제 시스템 시작 | q 키: 종료")
 
     while True:
-        ret, frame = camera.read()
-        if not ret or frame is None:  # 프레임 읽기 실패 시 재시도
+        ret, frame = camera.read()          # 카메라에서 프레임 한 장 읽기
+        if not ret or frame is None:        # 프레임 읽기 실패 시 재시도
             time.sleep(0.1)
             continue
 
         if not is_processing:
-            data, _, _ = qr_detector.detectAndDecode(frame)
+            data, _, _ = qr_detector.detectAndDecode(frame)    # QR 탐지 및 문자열 추출
             if data:
                 print(f"인식된 QR: {data}")
                 is_processing = True
@@ -139,15 +148,16 @@ def main():
                     threading.Thread(target=targets[level], args=(name, role, en), daemon=True).start()
                 else:
                     save_log("미등록", "-", "출입 거부")
-                    # frame.copy(): 스레드가 실행되는 동안 원본 프레임이 덮어씌워지는 것을 방지
+                    # frame.copy(): 스레드 실행 중 원본 프레임이 덮어씌워지는 것을 방지
                     threading.Thread(target=alarm, args=(frame.copy(),), daemon=True).start()
 
         if status_text:
+            # 처리 결과를 카메라 화면 좌측 상단에 텍스트로 표시
             cv2.putText(frame, status_text, (10, 40),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 255, 0), 2)
 
-        cv2.imshow("QR System", frame)
-        if cv2.waitKey(1) == ord('q'):
+        cv2.imshow("QR System", frame)          # 처리된 프레임을 창에 출력
+        if cv2.waitKey(1) == ord('q'):          # q 키 입력 시 종료
             break
 
     camera.release()
@@ -155,6 +165,7 @@ def main():
     green_led.off()
     red_led.off()
     buzzer.off()
+
 
 if __name__ == '__main__':
     main()
